@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime
 APP_ID = 730
-NEWS_COUNT = 3
+NEWS_COUNT = 5
 
 def get_steam_news():
     url = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/"
@@ -9,8 +9,15 @@ def get_steam_news():
         "appid": APP_ID,
         "count": NEWS_COUNT,
     }
-    response = requests.get(url, params=params)
+    try:
+        response = requests.get(url, params=params, timeout=10)
+    except requests.RequestException:
+        print("Couldn't reach Steam.")
+        return []
     data = response.json()
+    if "appnews" not in data or "newsitems" not in data["appnews"]:
+        print("Unexpected response from Steam")
+        return[]
     news_items = data["appnews"]["newsitems"]
     return news_items
 
