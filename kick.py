@@ -43,7 +43,7 @@ def check_channel(token, channel):
     if stream is None:
         print(channel, "is offline")
         return
-    live_status = info["stream"]["is_live"]
+    live_status = stream["is_live"]
     if live_status:
         print(channel, "is live")
     else:
