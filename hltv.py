@@ -1,9 +1,12 @@
-from state import load_seen, save_seen, get_seen_ids, mark_as_seen
+from state import filter_new
 import feedparser
 from time import strftime
 
 FEED_URL = "https://www.hltv.org/rss/news"
 NEWS_COUNT = 5
+
+def hltv_id(item):
+    return item.link
 
 def get_hltv_news():
     feed = feedparser.parse(FEED_URL)
@@ -14,17 +17,8 @@ def get_hltv_news():
 
 def get_new_hltv_news():
     all_news = get_hltv_news()
-    seen = load_seen()
-    already_seen = get_seen_ids(seen, "hltv")
-    new_items = []
-    for item in all_news:
-        item_id = item.link
-        if item_id in already_seen:
-            continue
-        new_items.append(item)
-        mark_as_seen(seen, "hltv", item_id)
-    save_seen(seen)
-    return new_items
+    return filter_new(all_news, "hltv", hltv_id)
+    
 
 def print_news(items):
     print("Latest HLTV news\n")

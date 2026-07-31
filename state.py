@@ -28,3 +28,16 @@ def mark_as_seen(seen, source, item_id):
         seen[source] = []
     if item_id not in seen[source]:
         seen[source].append(item_id)
+
+def filter_new(items, source, get_id):
+    seen = load_seen()
+    already_seen = get_seen_ids(seen, source)
+    new_items = []
+    for item in items:
+        item_id = get_id(item)
+        if item_id in already_seen:
+            continue
+        new_items.append(item)
+        mark_as_seen(seen, source, item_id)
+    save_seen(seen)
+    return new_items

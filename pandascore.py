@@ -1,3 +1,4 @@
+from state import filter_new
 import os
 import requests
 from datetime import datetime
@@ -10,6 +11,21 @@ FETCH_COUNT = 50
 DISPLAY_COUNT = 5
 FAVOURITE_TEAMS = ["NAVI", "Vitality", "Spirit", "MOUZ", "FaZe", "G2", "The MongolZ"]
 LOCAL_TZ = ZoneInfo("Europe/Bucharest")
+
+def match_id(match):
+    return match["id"]
+
+def get_favorite_matches():
+    all_matches = get_upcoming_matches()
+    favorites = []
+    for match in all_matches:
+        if is_favorite_match(match):
+            favorites.append(match)
+    return favorites
+
+def get_new_matches():
+    favorites = get_favorite_matches()
+    return filter_new(favorites, "matches", match_id)
 
 def get_upcoming_matches():
     url = "https://api.pandascore.co/csgo/matches/upcoming"
@@ -55,11 +71,8 @@ def format_start_time(iso_string):
     return local_time.strftime("%d %B, %H:%M")
 
 def print_matches(matches):
-    print("Upcoming CS2 matches\n")
-    shown = 0
-    for match in matches:
-        if not is_favorite_match(match):
-            continue
+    print("New matches for your teams\n")
+    for match in matches[:DISPLAY_COUNT]:
         name = match["name"]
         league = match["league"]["name"]
         start = format_start_time(match["begin_at"])
@@ -67,12 +80,10 @@ def print_matches(matches):
         print("League:", league)
         print("Starts:", start)
         print()
-        shown = shown + 1
-        if shown >= DISPLAY_COUNT:
-            break
-    if shown == 0:
-        print("No upcoming matches for your favorite teams.")
 
 if __name__ == "__main__":
-    matches = get_upcoming_matches()
-    print_matches(matches)
+    matches = get_new_matches()
+    if matches:
+        print_matches(matches)
+    else:
+        print ("No newly anounced matches for your teams.")

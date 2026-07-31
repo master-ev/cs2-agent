@@ -1,9 +1,12 @@
-from state import load_seen, save_seen, get_seen_ids, mark_as_seen
+from state import filter_new
 import requests
 import re
 from datetime import datetime
 APP_ID = 730
 NEWS_COUNT = 5
+
+def steam_id(item):
+    return item["gid"]
 
 def clean_bbcode(text):
     without_tags = re.sub(r"\[.*?\]", "", text)
@@ -31,17 +34,7 @@ def get_steam_news():
 
 def get_new_steam_news():
     all_news = get_steam_news()
-    seen = load_seen()
-    already_seen = get_seen_ids(seen, "steam")
-    new_items = []
-    for item in all_news:
-        item_id = item["gid"]
-        if item_id in already_seen:
-            continue
-        new_items.append(item)
-        mark_as_seen(seen, "steam", item_id)
-    save_seen(seen)
-    return new_items
+    return filter_new(all_news, "steam", steam_id)
 
 def print_news(news_items):
     print("Latest CS2 news\n")
