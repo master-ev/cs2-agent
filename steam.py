@@ -1,3 +1,4 @@
+from state import load_seen, save_seen, get_seen_ids, mark_as_seen
 import requests
 import re
 from datetime import datetime
@@ -28,6 +29,20 @@ def get_steam_news():
     news_items = data["appnews"]["newsitems"]
     return news_items
 
+def get_new_steam_news():
+    all_news = get_steam_news()
+    seen = load_seen()
+    already_seen = get_seen_ids(seen, "steam")
+    new_items = []
+    for item in all_news:
+        item_id = item["gid"]
+        if item_id in already_seen:
+            continue
+        new_items.append(item)
+        mark_as_seen(seen, "steam", item_id)
+    save_seen(seen)
+    return new_items
+
 def print_news(news_items):
     print("Latest CS2 news\n")
     for item in news_items:
@@ -47,5 +62,8 @@ def print_news(news_items):
 
 
 if __name__ == "__main__":
-    items = get_steam_news()
-    print_news(items)
+    items = get_new_steam_news()
+    if items:
+        print_news(items)
+    else:
+        print("No new CS2 updates since last check.")
