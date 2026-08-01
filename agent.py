@@ -184,8 +184,12 @@ def ask(question):
                     print(block.text)
             return
         results = []
+        handled_ids = []
         for block in response.content:
             if block.type == "tool_use":
+                if block.id in handled_ids:
+                    continue
+                handled_ids.append(block.id)
                 print("[tool: " + block.name + "]")
                 output = run_tool(block.name, block.input)
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": output,})
