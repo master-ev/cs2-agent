@@ -2,8 +2,8 @@ import os
 import anthropic
 from datetime import datetime
 from dotenv import load_dotenv
-from steam import get_steam_news, clean_bbcode
-from hltv import get_hltv_news
+from steam import get_steam_news, get_new_steam_news, clean_bbcode
+from hltv import get_hltv_news, get_new_hltv_news
 from reddit import get_reddit_posts
 from kick import get_access_token, check_channel_status
 from pandascore import get_favorite_matches, format_start_time
@@ -75,6 +75,17 @@ TOOLS = [
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "get_new_since_last_check",
+        "description": (
+            "Get ONLY what is new since the last time the user checked — new Steam "
+            "updates and new HLTV news they haven't seen yet. Use this for daily "
+            "briefings or when the user asks 'what's new?' or 'anything I missed?'. "
+            "Do not use this when the user asks about a specific topic — use the "
+            "regular tools for that."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
 SYSTEM_PROMPT = (
@@ -83,7 +94,10 @@ SYSTEM_PROMPT = (
     "Never reply in Romanian.\n\n"
     "You are a CS2 esports assistant with access to several live sources. "
     "Use the tools to answer questions about the CS2 scene. "
-    "If a question needs several sources, call several tools. "
+    "If a question needs several sources, call several tools.\n\n"
+    "If a tool result starts with ERROR, tell the user that source could not be "
+    "checked — never present it as 'nothing new'. Do not invent information that "
+    "did not come from a tool.\n\n"
     "Be concise and factual."
 )
 
@@ -117,20 +131,45 @@ def format_matches(matches):
 
 def run_tool(name, tool_input):
     if name == "get_cs2_updates":
-        return format_news(get_steam_news())
+        news = get_steam_news()
+        if not news:
+            return "Error: Couldn't fetch Steam updates. The source may be unreachable."
+        return format_news(news)
     if name == "get_scene_news":
-        return format_hltv(get_hltv_news())
+        news = get_hltv_news()
+        if not news:
+            return "Error: Couln't fetch HLTV news. The source may be unreachable."
+        return format_hltv(news)
     if name == "get_community_posts":
         subreddit = tool_input["subreddit"]
-        return format_posts(get_reddit_posts(subreddit))
+        posts = get_reddit_posts(subreddit)
+        if not posts:
+            return "Error: Couldn't fetch posts from r/" + subreddit + " (possibly rate-limited)."
+        return format_posts(posts)
     if name == "check_stream":
         channel = tool_input["channel"]
         token = get_access_token()
         if token is None:
-            return "Couldn't authenticate with Kick."
+            return "Error: Couldn't authenticate with Kick."
         return check_channel_status(token, channel)
     if name == "get_upcoming_matches":
-        return format_matches(get_favorite_matches())
+        matches = get_favorite_matches()
+        if not matches:
+            return "No upcoming matches found for the favorite teams."
+        return format_matches(matches)
+    if name == "get_new_since_last_check":
+        new_updates = get_new_steam_news()
+        new_news = get_new_hltv_news()
+        parts = []
+        if new_updates:
+            parts.append("New Steam updates:\n" + format_news(new_updates))
+        else:
+            parts.append("No new Steam updates since last check.")
+        if new_news:
+            parts.append("New HLTV news:\n" + format_hltv(new_news))
+        else:
+            parts.append("No new HLTV news since last check.")
+        return "\n\n".join(parts)
     return "Unknown tool: " + name
     
 def ask(question):
@@ -152,5 +191,16 @@ def ask(question):
                 results.append({"type": "tool_result", "tool_use_id": block.id, "content": output,})
         messages.append({"role": "user", "content": results})
 
+def chat():
+    print("CS2 agent ready. Type 'quit' to exit.\n")
+    while True:
+        question = input("> ")
+        if question.lower() in ["quit", "exit", "q"]:
+            break
+        if not question.strip():
+            continue
+        ask(question)
+        print()
+
 if __name__ == "__main__":
-    ask("Se mai stie ceva de iM?")
+    chat()
