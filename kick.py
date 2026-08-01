@@ -49,6 +49,24 @@ def check_channel(token, channel):
     else:
         print(channel, "is offline")
 
+def check_channel_status(token, channel):
+    url = "https://api.kick.com/public/v1/channels"
+    headers = {"Authorization": "Bearer " + token}
+    params = {"slug": channel}
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+    except requests.RequestException:
+        return "Could not reach Kick."
+    if response.status_code != 200:
+        return "Kick returned status " + str(response.status_code)
+    channels = response.json()["data"]
+    if not channels:
+        return "Channel not found: " + channel
+    stream = channels[0].get("stream")
+    if stream is None or not stream["is_live"]:
+        return channel + " is offline."
+    return channel + " is LIVE right now."
+
 if __name__ == "__main__":
     token = get_access_token()
     if token:
