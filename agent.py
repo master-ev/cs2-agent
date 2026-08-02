@@ -11,6 +11,7 @@ from pandascore import get_favorite_matches, format_start_time
 load_dotenv()
 client = anthropic.Anthropic()
 MODEL = "claude-haiku-4-5-20251001"
+MAX_HISTORY = 20
 
 TOOLS = [
     {
@@ -95,6 +96,9 @@ SYSTEM_PROMPT = (
     "You are a CS2 esports assistant with access to several live sources. "
     "Use the tools to answer questions about the CS2 scene. "
     "If a question needs several sources, call several tools.\n\n"
+    "The match tool already filters to the user's favorite teams. Never ask them "
+    "which teams they follow, and never suggest they set favorites up — that is "
+    "already configured. If no matches come back, simply say none are scheduled.\n\n"
     "If a tool result starts with ERROR, tell the user that source could not be "
     "checked — never present it as 'nothing new'. Do not invent information that "
     "did not come from a tool.\n\n"
@@ -172,8 +176,8 @@ def run_tool(name, tool_input):
         return "\n\n".join(parts)
     return "Unknown tool: " + name
     
-def ask(question):
-    messages = [{"role": "user", "content": question}]
+def ask(question, messages):
+    messages.append({"role": "user", "content": question})
     while True:
         response = client.messages.create(model=MODEL, max_tokens=1500, system=SYSTEM_PROMPT, tools=TOOLS, messages=messages,)
         # reply-ul modelului
@@ -196,14 +200,21 @@ def ask(question):
         messages.append({"role": "user", "content": results})
 
 def chat():
-    print("CS2 agent ready. Type 'quit' to exit.\n")
+    print("CS2 agent ready. Type 'quit' to exit, 'reset' to clear history.\n")
+    messages = []
     while True:
         question = input("> ")
         if question.lower() in ["quit", "exit", "q"]:
             break
+        if question.lower() == "reset":
+            messages = []
+            print("History cleared.\n")
+            continue
         if not question.strip():
             continue
-        ask(question)
+        if len(messages) > MAX_HISTORY:
+            messages = messages[-MAX_HISTORY:]
+        ask(question, messages)
         print()
 
 if __name__ == "__main__":

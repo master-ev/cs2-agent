@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 TOKEN = os.getenv("PANDASCORE_TOKEN")
-FETCH_COUNT = 50
+FETCH_COUNT = 100
 DISPLAY_COUNT = 5
 FAVOURITE_TEAMS = ["NAVI", "Vitality", "Spirit", "MOUZ", "FaZe", "G2", "The MongolZ"]
 LOCAL_TZ = ZoneInfo("Europe/Bucharest")
@@ -52,15 +52,21 @@ def get_team_names(match):
             names.append(name)
     return names
 
+SECONDARY_TAGS = [
+    "academy", "junior", "prodigy", "prospects", "rising",
+    "up next", "nxt", "youngsters", ".a", ".n",
+]
+
 def is_favorite_match(match):
     if not FAVOURITE_TEAMS:
         return True
     team_names = get_team_names(match)
     for team in team_names:
-        if "academy" in team.lower() or "junior" in team.lower():
+        lowered = team.lower()
+        if any(tag in lowered for tag in SECONDARY_TAGS):
             continue
         for favorite in FAVOURITE_TEAMS:
-            if favorite.lower() in team.lower():
+            if favorite.lower() in lowered:
                 return True
     return False
 
