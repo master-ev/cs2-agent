@@ -15,31 +15,70 @@ LOCAL_TZ = ZoneInfo("Europe/Bucharest")
 def match_id(match):
     return match["id"]
 
-def get_favorite_matches():
-    all_matches = get_upcoming_matches()
-    favorites = []
-    for match in all_matches:
-        if is_favorite_match(match):
-            favorites.append(match)
-    return favorites
-
-def get_new_matches():
-    favorites = get_favorite_matches()
-    return filter_new(favorites, "matches", match_id)
-
-def get_upcoming_matches():
-    url = "https://api.pandascore.co/csgo/matches/upcoming"
-    headers = {"Authorization": "Bearer " + TOKEN,}
-    params = {"per_page": FETCH_COUNT,}
+def fetch_matches(endpoint):
+    url = "https://api.pandascore.co/csgo/matches/" + endpoint
+    headers = {"Authorization": "Bearer " + TOKEN}
+    params = {"per_page": FETCH_COUNT}
     try:
         response = requests.get(url, headers=headers, params=params, timeout=10)
     except requests.RequestException:
         print("Couldn't reach PandaScore.")
         return []
     if response.status_code != 200:
-        print("Failed to fetch matches. Status:", response.status_code)
+        print("Failed to fetch matches. Status::", response.status_code)
         return []
     return response.json()
+
+def get_upcoming_matches():
+    return fetch_matches("upcoming")
+
+def get_past_matches():
+    return fetch_matches("past")
+
+def get_running_matches():
+    return fetch_matches("running")
+
+def get_favorite_matches():
+    favorites = []
+    for match in get_upcoming_matches():
+        if is_favorite_match(match):
+            favorites.append(match)
+    return favorites
+
+def get_favorite_results():
+    results = []
+    for match in get_past_matches():
+        if is_favorite_match(match):
+            results.append(match)
+    return results
+
+def get_favorite_live():
+    live = []
+    for match in get_running_matches():
+        if is_favorite_match(match):
+            live.append(match)
+    return live
+
+def format_score(match):
+    results = match.get("results", [])
+    opponents = match.get("opponents", [])
+    if len(results) < 2 or len(opponents) < 2:
+        return "score unavailable"
+    parts = []
+    for result in results:
+        team_id = result.get("team_id")
+        score = result.get("score")
+        name = "?"
+        for entry in opponents:
+            opponent = entry.get("opponent")
+            if opponent and opponent.get("id") == team_id:
+                name = opponent.get("name")
+        parts.append(name + " " + str(score))
+    return " - ".join(parts)
+
+def get_new_matches():
+    favorites = get_favorite_matches()
+    return filter_new(favorites, "matches", match_id)
 
 def get_team_names(match):
     names = []
@@ -75,6 +114,21 @@ def format_start_time(iso_string):
     utc_time = datetime.fromisoformat(cleaned)
     local_time = utc_time.astimezone(LOCAL_TZ)
     return local_time.strftime("%d %B, %H:%M")
+
+def minutes_until(iso_string):
+    cleaned = iso_string.replace("Z", "+00:00")
+    start = datetime.fromisoformat(cleaned)
+    now = datetime.now(tz=LOCAL_TZ)
+    difference = start - now
+    return difference.total_seconds() / 60
+
+def get_matches_starting_soon(within_minutes=60):
+    soon = []
+    for match in get_favorite_matches():
+        minutes = minutes_until(match["begin_at"])
+        if 0 < minutes <= within_minutes:
+            soon.append(match)
+    return soon
 
 def print_matches(matches):
     print("New matches for your teams\n")

@@ -6,7 +6,7 @@ from steam import get_steam_news, get_new_steam_news, clean_bbcode
 from hltv import get_hltv_news, get_new_hltv_news
 from reddit import get_reddit_posts
 from kick import get_access_token, check_channel_status
-from pandascore import get_favorite_matches, format_start_time
+from pandascore import (get_favorite_matches, get_favorite_results, get_favorite_live, format_start_time, format_score, get_matches_starting_soon, minutes_until)
 
 load_dotenv()
 client = anthropic.Anthropic()
@@ -87,6 +87,41 @@ TOOLS = [
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "get_recent_results",
+        "description": (
+            "Get recently finished CS2 matches for the user's favorite teams, "
+            "with final scores. Use when asked how a match ended, who won, "
+            "or about recent results."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_live_matches",
+        "description": (
+            "Get CS2 matches for the user's favorite teams that are being played "
+            "right now, with the current score. Use when asked what is on right "
+            "now or about live matches."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "get_matches_starting_soon",
+        "description": (
+            "Check which of the user's favorite teams are about to play, within "
+            "the next hour or so. Use when asked if anything starts soon or "
+            "whether they should tune in."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "within_minutes": {
+                    "type": "integer",
+                    "description": "How far ahead to look, in minutes. Default 60.",
+                }
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = (
@@ -133,6 +168,14 @@ def format_matches(matches):
         parts.append(line)
     return "\n".join(parts)
 
+def format_results(matches):
+    parts = []
+    for match in matches[:10]:
+        line = match["name"] + " - " + match["league"]["name"]
+        line = line + " - " + format_score(match)
+        parts.append(line)
+    return "\n".join(parts)
+
 def run_tool(name, tool_input):
     if name == "get_cs2_updates":
         news = get_steam_news()
@@ -161,6 +204,27 @@ def run_tool(name, tool_input):
         if not matches:
             return "No upcoming matches found for the favorite teams."
         return format_matches(matches)
+    if name == "get_recent_results":
+        matches = get_favorite_results()
+        if not matches:
+            return "No recent matches found for the favorite teams."
+        return format_results(matches)
+    if name == "get_live_matches":
+        matches = get_favorite_live()
+        if not matches:
+            return "None of the favorite teams are playing right now."
+        return format_results(matches)
+    if name == "get_matches_starting_soon":
+        window = tool_input.get("within_minutes", 60)
+        matches = get_matches_starting_soon(window)
+        if not matches:
+            return "Nothing starting in the next " + str(window) + " minutes."
+
+        parts = []
+        for match in matches:
+            minutes = int(minutes_until(match["begin_at"]))
+            parts.append(match["name"] + " starts in " + str(minutes) + " minutes")
+        return "\n".join(parts)
     if name == "get_new_since_last_check":
         new_updates = get_new_steam_news()
         new_news = get_new_hltv_news()
